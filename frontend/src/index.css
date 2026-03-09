@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* Earthy, farming-inspired palette */
+    --background: 45 30% 97%;
+    --foreground: 25 25% 15%;
+
+    --card: 45 25% 95%;
+    --card-foreground: 25 25% 15%;
+
+    --popover: 45 30% 97%;
+    --popover-foreground: 25 25% 15%;
+
+    /* Forest green primary */
+    --primary: 142 45% 28%;
+    --primary-foreground: 45 30% 97%;
+
+    /* Warm tan/brown secondary */
+    --secondary: 35 35% 85%;
+    --secondary-foreground: 25 30% 20%;
+
+    --muted: 40 20% 90%;
+    --muted-foreground: 25 15% 45%;
+
+    /* Golden wheat accent */
+    --accent: 42 85% 55%;
+    --accent-foreground: 25 30% 15%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 45 30% 97%;
+
+    --border: 35 25% 85%;
+    --input: 35 25% 88%;
+    --ring: 142 45% 28%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --success: 142 55% 40%;
+    --success-foreground: 45 30% 97%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 25 30% 15%;
+    --soil: 25 40% 35%;
+    --soil-foreground: 45 30% 97%;
+    --water: 200 70% 50%;
+    --water-foreground: 45 30% 97%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(142 45% 28%) 0%, hsl(142 35% 35%) 50%, hsl(85 40% 40%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(45 25% 95%) 0%, hsl(40 20% 92%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(42 85% 55%) 0%, hsl(35 80% 50%) 100%);
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(25 25% 15% / 0.1);
+    --shadow-elevated: 0 8px 30px -8px hsl(25 25% 15% / 0.15);
+    --shadow-glow: 0 0 40px hsl(142 45% 28% / 0.2);
+
+    --sidebar-background: 45 25% 95%;
+    --sidebar-foreground: 25 25% 15%;
+    --sidebar-primary: 142 45% 28%;
+    --sidebar-primary-foreground: 45 30% 97%;
+    --sidebar-accent: 40 20% 90%;
+    --sidebar-accent-foreground: 25 30% 20%;
+    --sidebar-border: 35 25% 85%;
+    --sidebar-ring: 142 45% 28%;
+  }
+
+  .dark {
+    --background: 25 25% 10%;
+    --foreground: 45 20% 92%;
+
+    --card: 25 22% 14%;
+    --card-foreground: 45 20% 92%;
+
+    --popover: 25 22% 14%;
+    --popover-foreground: 45 20% 92%;
+
+    --primary: 142 50% 45%;
+    --primary-foreground: 25 25% 10%;
+
+    --secondary: 30 20% 22%;
+    --secondary-foreground: 45 20% 92%;
+
+    --muted: 25 18% 20%;
+    --muted-foreground: 40 15% 60%;
+
+    --accent: 42 80% 50%;
+    --accent-foreground: 25 25% 10%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 45 20% 92%;
+
+    --border: 30 18% 25%;
+    --input: 30 18% 25%;
+    --ring: 142 50% 45%;
+
+    --sidebar-background: 25 22% 12%;
+    --sidebar-foreground: 45 20% 92%;
+    --sidebar-primary: 142 50% 45%;
+    --sidebar-primary-foreground: 25 25% 10%;
+    --sidebar-accent: 25 18% 20%;
+    --sidebar-accent-foreground: 45 20% 92%;
+    --sidebar-border: 30 18% 25%;
+    --sidebar-ring: 142 50% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Nunito', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Nunito', sans-serif;
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    background: var(--gradient-hero);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .bg-gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
