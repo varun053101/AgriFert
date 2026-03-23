@@ -1,0 +1,91 @@
+# AgriFert — Architecture Overview
+
+This document describes the high-level architecture of the AgriFert monorepo.
+
+## Repository Structure
+
+```
+AgriFert/
+├── README.md
+├── .gitignore
+├── docs/
+│   └── architecture.md        ← this file
+├── backend/
+│   ├── server/                # Node.js · Express · Mongoose
+│   │   └── docs/
+│   │       ├── api.md         # REST endpoint reference
+│   │       └── authentication.md
+│   └── ml_service/            # Python · Flask · scikit-learn
+│       └── docs/
+│           ├── api.md         # ML service endpoint reference
+│           └── model.md       # Model architecture & features
+└── frontend/                  # React · Vite · TypeScript · Tailwind
+    └── docs/
+        └── development.md     # Dev setup, env vars, folder guide
+```
+
+## System Architecture
+
+```
+┌─────────────────── Browser ─────────────────────┐
+│           React SPA (Vite · TypeScript)          │
+│               http://localhost:5173              │
+└─────────────────────┬───────────────────────────┘
+                       │  HTTPS · JWT Bearer
+                       ▼
+┌─────────────────── Express Server ──────────────┐
+│  PORT 5000  ·  Node 18  ·  Mongoose             │
+│                                                  │
+│  /api/auth    →  auth.controller                 │
+│  /api/analyze →  analyze.controller              │
+│  /api/weather →  weather.controller              │
+│  /api/admin   →  admin.controller                │
+└───┬──────────┬──────────────────┬───────────────┘
+    │          │                  │
+    │ Axios    │ Axios            │ Google AI SDK
+    ▼          ▼                  ▼
+┌────────┐  ┌──────────────┐  ┌──────────────────┐
+│ Flask  │  │ OpenWeather  │  │  Gemini API      │
+│  ML    │  │  Map API     │  │ (soil tips)      │
+│ :8000  │  └──────────────┘  └──────────────────┘
+│        │
+│ Random │  ┌──────────────┐
+│ Forest │  │ MongoDB Atlas│
+└────────┘  └──────────────┘
+```
+
+## Service Responsibilities
+
+| Service | Responsibility |
+|---------|---------------|
+| **Frontend** | UI, auth state, form submission, results display |
+| **Server** | Auth, routing, orchestration, data persistence |
+| **ML Service** | Feature encoding, model inference, confidence scoring |
+| **MongoDB** | Users, Predictions |
+| **OpenWeatherMap** | Real-time temperature, humidity & moisture |
+| **Gemini API** | AI-generated soil health tips per prediction |
+
+## Data Flow — Analyze Request
+
+```
+1. User submits soil form (frontend)
+2. POST /api/analyze (server)  ← JWT auth check + rate limit
+3. Server → POST /predict (ml_service)  ← internal API key
+4. ml_service encodes features → model.predict() → returns fertilizer + confidence
+5. Server → GET weather (OpenWeatherMap)  if lat/lon provided
+6. Server → Gemini.generateContent()  → soil health tips
+7. Server saves Prediction doc to MongoDB
+8. Server returns unified response to frontend
+```
+
+## Security Model
+
+| Concern | Mechanism |
+|---------|-----------|
+| XSS/clickjacking | `helmet` middleware |
+| NoSQL injection | `express-mongo-sanitize` |
+| Brute force | `express-rate-limit` per route |
+| CORS | allow-list via `ALLOWED_ORIGINS` env var |
+| Auth | JWT access token (7d) + refresh token (30d) |
+| ML service | `X-Internal-API-Key` header; not exposed to browser |
+| Admin access | `role: "admin"` checked server-side after JWT verify |
