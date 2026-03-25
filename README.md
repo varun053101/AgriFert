@@ -28,8 +28,8 @@ Browser (React SPA)
 | Service       | Tech Stack                          | Default Port |
 |---------------|-------------------------------------|:---:|
 | `server`      | Node 18 · Express · Mongoose        | 5000 |
-| `ml_service`  | Python 3.11 · Flask · scikit-learn  | 8000 |
-| `frontend`    | React 18 · Vite · TypeScript · Tailwind | 5173 |
+| `ml_service`  | Python 3.10+ · Flask · scikit-learn  | 8000 |
+| `frontend`    | React 18 · Vite · TypeScript · Tailwind | 8080 |
 
 ---
 
@@ -59,7 +59,7 @@ cd AgriFert
 cd backend/ml_service
 python -m venv venv
 # Windows:
-venv\Scripts\activate
+venv\Scripts\Activate.ps1
 # macOS/Linux:
 source venv/bin/activate
 
@@ -87,11 +87,11 @@ node server.js
 ```bash
 cd frontend
 npm install
-cp .env.example .env        # set VITE_API_URL=http://localhost:5000
+cp .env.example .env        # VITE_API_BASE_URL is pre-set to /api via Vite proxy
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
+Open **http://localhost:8080** in your browser.
 
 ---
 
@@ -132,7 +132,8 @@ Open **http://localhost:5173** in your browser.
 
 | Variable | Required | Description |
 |---|:---:|---|
-| `VITE_API_URL` | ✓ | Base URL of the Express server |
+| `VITE_API_BASE_URL` | – | API base path (default `/api`, proxied by Vite to `localhost:5000`) |
+| `VITE_APP_NAME` | – | App name shown in the header (default `AgriFert`) |
 
 ---
 
@@ -182,7 +183,6 @@ Open **http://localhost:5173** in your browser.
 | [Authentication](./backend/server/docs/authentication.md) | JWT auth flow, middleware, admin setup |
 | [ML Service API](./backend/ml_service/docs/api.md) | Flask endpoints, valid inputs, error codes |
 | [ML Model](./backend/ml_service/docs/model.md) | Model architecture, training pipeline, features |
-| [Frontend Dev Guide](./frontend/docs/development.md) | Folder structure, routing, env vars, scripts |
 
 ---
 
