@@ -24,8 +24,9 @@ Two services must run at the same time:
 
 **1. Place the dataset**
 ```
-backed/ml_service/dataset/   ← put filtered_fertilizer_data.csv here
+backend/ml_service/dataset/filtered_fertilizer_data.csv
 ```
+
 > The `dataset/` and `model/` folders exist in git (via `.gitkeep`) but their contents are gitignored.
 > Large binary/CSV files must be placed manually after cloning.
 
