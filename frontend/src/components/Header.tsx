@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Sprout, LayoutDashboard, Menu, X, LogIn, LogOut, User } from 'lucide-react';
+import { Home, FlaskConical, LayoutDashboard, Menu, X, LogIn, LogOut, User } from 'lucide-react';
+
+
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -14,11 +16,12 @@ const Header = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const navLinks = [
-    { path: '/', label: 'Home', icon: Sprout },
-    { path: '/analyze', label: 'Analyze Soil', icon: Sprout },
+    { path: '/', label: 'Home', icon: Home },
+    { path: '/analyze', label: 'Analyze Soil', icon: FlaskConical },
     ...(user?.role === 'admin'
       ? [{ path: '/admin', label: 'Admin Dashboard', icon: LayoutDashboard }]
       : []),
+
   ];
 
   const handleLogout = async () => {
@@ -35,11 +38,13 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container flex h-16 items-center justify-between md:h-20">
         <Link to="/" className="flex items-center gap-2 md:gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-hero md:h-12 md:w-12">
-            <Sprout className="h-5 w-5 text-primary-foreground md:h-6 md:w-6" />
-          </div>
+          <img
+            src="/logo.svg"
+            alt="AgriFert logo"
+            className="h-10 w-10 md:h-12 md:w-12 rounded-xl"
+          />
           <span className="text-lg font-bold text-foreground md:text-xl">
-            {import.meta.env.VITE_APP_NAME ?? 'AgriFertAI'}
+            {import.meta.env.VITE_APP_NAME ?? 'AgriFert'}
           </span>
         </Link>
 
