@@ -1,0 +1,3 @@
+# This file keeps the dataset/ directory tracked by git.
+# The actual CSV dataset is gitignored (it is large).
+# Download filtered_fertilizer_data.csv and place it here before training.
