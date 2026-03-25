@@ -1,5 +1,32 @@
+const axios = require("axios");
 const Prediction = require("../models/Prediction");
 const User = require("../models/User");
+
+// Axios instance for internal Node ↔ Flask calls
+const mlClient = axios.create({
+  baseURL: process.env.ML_SERVICE_URL,
+  timeout: 5000,
+  headers: { "X-Internal-API-Key": process.env.ML_SERVICE_API_KEY },
+});
+
+/**
+ * Fetch real model accuracy from the Flask /metrics endpoint.
+ * Falls back gracefully if the service is unavailable or metrics.json
+ * hasn't been generated yet (i.e. model hasn't been trained).
+ */
+const fetchMLMetrics = async () => {
+  try {
+    const { data } = await mlClient.get("/metrics");
+    return {
+      modelVersion: data.modelVersion ?? null,
+      accuracy:     data.accuracy != null ? Math.round(data.accuracy * 100 * 10) / 10 : null,
+      lastUpdate:   data.trainedAt ?? null,
+      predictions:  null, // filled from DB below
+    };
+  } catch {
+    return null; // Flask down or metrics.json missing
+  }
+};
 
 /**
  * Returns all stats needed by the admin dashboard in a single call.
@@ -103,29 +130,12 @@ const getAdminStats = async () => {
       },
     ]),
 
-    // 7. Model performance metrics
-    Prediction.aggregate([
-      {
-        $group: {
-          _id: "$modelVersion",
-          predictions: { $sum: 1 },
-          avgConfidence: { $avg: "$output.modelConfidence" },
-          lastUsed: { $max: "$createdAt" },
-        },
-      },
-      { $sort: { lastUsed: -1 } },
-      { $limit: 1 },
-      {
-        $project: {
-          _id: 0,
-          modelVersion: "$_id",
-          predictions: 1,
-          accuracy: { $round: [{ $multiply: ["$avgConfidence", 400] }, 1] },
-          lastUpdate: "$lastUsed",
-        },
-      },
-    ]),
+    // 7. Total predictions (for the model metrics card)
+    Prediction.countDocuments(),
   ]);
+
+  // Fetch real accuracy from Flask ML service (not averaged from old DB records)
+  const liveMLMetrics = await fetchMLMetrics();
 
   const metrics = averageSoilMetrics[0] || {
     averageTemperature: 0,
@@ -135,13 +145,18 @@ const getAdminStats = async () => {
     averageYieldImprovement: 0,
   };
 
+  // modelMetrics[0] is now just the total prediction count from the last parallel query
+  const totalPredictions = modelMetrics; // renamed for clarity (it's a plain count now)
+
   return {
     totalSubmissions,
     totalUsers,
     cropDistribution,
     fertilizerUsage,
     yieldTrends,
-    modelMetrics: modelMetrics[0] || { predictions: 0, accuracy: null, lastUpdate: null },
+    modelMetrics: liveMLMetrics
+      ? { ...liveMLMetrics, predictions: totalPredictions }
+      : { predictions: totalPredictions, accuracy: null, lastUpdate: null, modelVersion: null },
     ...metrics,
   };
 };
