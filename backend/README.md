@@ -22,7 +22,14 @@ Two services must run at the same time:
 
 ### A — ML Service
 
-**1. Train the model** (only needed once; creates all `.pkl` files):
+**1. Place the dataset**
+```
+backed/ml_service/dataset/   ← put filtered_fertilizer_data.csv here
+```
+> The `dataset/` and `model/` folders exist in git (via `.gitkeep`) but their contents are gitignored.
+> Large binary/CSV files must be placed manually after cloning.
+
+**2. Create virtual environment and install packages**
 ```bash
 cd backend/ml_service
 
@@ -33,9 +40,10 @@ venv\Scripts\Activate.ps1         # Windows PowerShell
 source venv/bin/activate           # Mac / Linux
 
 pip install -r requirements.txt
-pip install pandas scikit-learn xgboost joblib numpy
+```
 
-# Place dataset:  backend/ml_service/dataset/filtered_fertilizer_data.csv
+**3. Train the model** (generates all 5 `.pkl` files into `model/`):
+```bash
 python train_model.py
 ```
 
@@ -132,9 +140,12 @@ Expected output:
 [ML] Loaded crop_encoder.pkl
 [ML] Loaded fert_encoder.pkl
 [ML] Loaded scaler.pkl
-[ML] Starting on port 8000
+[ML] Starting on port 8000  (model ready: True)
  * Running on http://0.0.0.0:8000
 ```
+
+> **If you see `model ready: False`**: the `.pkl` files are missing.  
+> Run `python train_model.py` inside the virtual environment first.
 
 Quick check:
 ```bash
