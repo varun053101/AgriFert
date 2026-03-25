@@ -36,7 +36,7 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(BASE_DIR, "dataset")
 MODEL_DIR   = os.path.join(BASE_DIR, "model")
 
-DATASET_PATH = os.path.join(DATASET_DIR, "filtered_fertilizer_data.csv")
+DATASET_PATH = os.path.join(DATASET_DIR, "dataset.csv")
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -218,9 +218,11 @@ print(classification_report(y_test, voting_pred, target_names=fert_encoder.class
 print("Confusion Matrix:\n", confusion_matrix(y_test, voting_pred))
 
 # ===========================================================================
-# 13. Save Model, Encoders & Scaler
+# 13. Save Model, Encoders, Scaler & Metrics
 # ===========================================================================
 print("\nSTEP 13 — Saving artifacts to model/")
+
+import json, datetime
 
 joblib.dump(voting_model,  os.path.join(MODEL_DIR, "voting_classifier_model.pkl"))
 joblib.dump(soil_encoder,  os.path.join(MODEL_DIR, "soil_encoder.pkl"))
@@ -228,10 +230,22 @@ joblib.dump(crop_encoder,  os.path.join(MODEL_DIR, "crop_encoder.pkl"))
 joblib.dump(fert_encoder,  os.path.join(MODEL_DIR, "fert_encoder.pkl"))
 joblib.dump(scaler,        os.path.join(MODEL_DIR, "scaler.pkl"))
 
+# Persist real test-set accuracy so the Flask /metrics endpoint can serve it
+metrics_payload = {
+    "accuracy":    round(float(voting_acc), 4),
+    "trainedAt":   datetime.datetime.utcnow().isoformat() + "Z",
+    "testSize":    int(X_test.shape[0]),
+    "trainSize":   int(X_train.shape[0]),
+}
+metrics_path = os.path.join(MODEL_DIR, "metrics.json")
+with open(metrics_path, "w") as f:
+    json.dump(metrics_payload, f, indent=2)
+
 print("Saved:")
 print(f"  model/voting_classifier_model.pkl")
 print(f"  model/soil_encoder.pkl")
 print(f"  model/crop_encoder.pkl")
 print(f"  model/fert_encoder.pkl")
 print(f"  model/scaler.pkl")
+print(f"  model/metrics.json  (accuracy={voting_acc:.4f})")
 print("\nTraining complete!")

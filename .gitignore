@@ -45,6 +45,7 @@ dist/
 *.model
 backend/ml_service/model/*.pkl
 backend/ml_service/dataset/*.csv
+backend/ml_service/model/*.json
 
 # OS
 .DS_Store

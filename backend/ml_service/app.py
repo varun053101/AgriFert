@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import warnings
@@ -149,6 +150,21 @@ def predict():
         "modelVersion":   MODEL_VERSION,
         "processingMs":   elapsed_ms,
     })
+
+
+@app.route("/metrics", methods=["GET"])
+@require_api_key
+def metrics():
+    """Return the real test-set accuracy saved by train_model.py."""
+    metrics_path = os.path.join(MODEL_DIR, "metrics.json")
+    if not os.path.exists(metrics_path):
+        return jsonify({
+            "error": "metrics.json not found — run python train_model.py to generate it"
+        }), 404
+    with open(metrics_path, "r") as f:
+        data = json.load(f)
+    data["modelVersion"] = MODEL_VERSION
+    return jsonify(data)
 
 
 @app.route("/health", methods=["GET"])
