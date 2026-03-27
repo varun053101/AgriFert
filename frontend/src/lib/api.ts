@@ -95,18 +95,12 @@ export interface User {
 export interface SoilCropData {
   cropType: string;
   soilType: string;
-  soilPH: number;
   nitrogen: number;
   phosphorus: number;
   potassium: number;
   soilMoisture: number;
-  state: string;
-  district: string;
   temperature: number;
-  humidity: number
-  useGPS: boolean;
-  lat?: number;
-  lng?: number;
+  humidity: number;
 }
 
 export interface Recommendation {
@@ -119,11 +113,11 @@ export interface Recommendation {
       potassium: number;
     };
     totalQuantity: number;
-    unit: string;
+    unit: string;  // always "kg per acre"
   };
   yieldImprovement: {
     percentage: number;
-    bushelsPerAcre: number;
+    bushelsPerAcre: number | null; // null for Cotton & Sugarcane (not measured in bushels)
   };
   soilHealthTips: string[];
   modelConfidence: number;
@@ -157,12 +151,10 @@ export const authApi = {
 // ─── Weather API ──────────────────────────────────────────────────────────────
 export interface WeatherData {
   temperature: number;
-  feelsLike: number;
   humidity: number;
   condition: string;
   description: string;
   city: string;
-  country: string;
 }
 
 export const weatherApi = {
@@ -193,11 +185,6 @@ export const analyzeApi = {
       nitrogen:    data.nitrogen,
       potassium:   data.potassium,
       phosphorous: data.phosphorus,       // backend uses 'phosphorous'
-      state:    data.state    || undefined,
-      district: data.district || undefined,
-      ...(data.useGPS && data.lat != null && data.lng != null
-        ? { coordinates: { lat: data.lat, lng: data.lng } }
-        : {}),
     };
     return api.post<{ data: Recommendation }>('/analyze', payload);
   },

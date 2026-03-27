@@ -129,16 +129,12 @@ const AnalyzeForm = () => {
       const data: SoilCropData = {
         cropType:     formData.cropType,
         soilType:     formData.soilType,
-        soilPH:       7,                              // not used by model; default neutral
         nitrogen:     parseFloat(formData.nitrogen),
         phosphorus:   parseFloat(formData.phosphorus),
         potassium:    parseFloat(formData.potassium),
         soilMoisture: parseFloat(formData.soilMoisture),
-        state:        '',
-        district:     '',
         temperature:  parseFloat(formData.temperature),
         humidity:     parseFloat(formData.humidity),
-        useGPS,
       };
 
       const response = await analyzeApi.submit(data);
