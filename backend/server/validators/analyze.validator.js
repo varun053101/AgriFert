@@ -46,14 +46,7 @@ const analyzeSchema = Joi.object({
     "number.base": "'phosphorous' must be a number",
     "any.required": "'phosphorous' is required",
   }),
-
-  // Optional location context (stored in DB, not sent to model)
-  state:    Joi.string().trim().max(100).optional(),
-  district: Joi.string().trim().max(100).optional(),
-  coordinates: Joi.object({
-    lat: Joi.number().min(-90).max(90).required(),
-    lng: Joi.number().min(-180).max(180).required(),
-  }).optional(),
+  
 });
 
-module.exports = { analyzeSchema, VALID_SOIL_TYPES, VALID_CROP_TYPES };
+module.exports = { analyzeSchema };

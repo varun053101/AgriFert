@@ -85,12 +85,10 @@ const getWeatherByLocation = async (state, district) => {
 
 const formatWeatherResponse = (raw) => ({
   temperature: Math.round(raw.main.temp),
-  feelsLike:   Math.round(raw.main.feels_like),
   humidity:    raw.main.humidity,
   condition:   raw.weather[0]?.main || "Unknown",
   description: raw.weather[0]?.description || "",
   city:        raw.name,
-  country:     raw.sys?.country,
 });
 
 module.exports = { getWeatherByCoords, getWeatherByLocation };

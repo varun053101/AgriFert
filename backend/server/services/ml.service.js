@@ -123,7 +123,6 @@ const getPrediction = async (inputData) => {
     output: {
       fertilizerName,
       ...details,
-      unit: "kg per acre",
       yieldImprovement,
       soilHealthTips,
       modelConfidence: confidence ?? null,

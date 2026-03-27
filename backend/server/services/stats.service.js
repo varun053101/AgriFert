@@ -40,7 +40,6 @@ const getAdminStats = async () => {
     fertilizerUsage,
     averageSoilMetrics,
     yieldTrends,
-    modelMetrics,
   ] = await Promise.all([
     // 1. Total prediction count
     Prediction.countDocuments(),
@@ -129,9 +128,6 @@ const getAdminStats = async () => {
         },
       },
     ]),
-
-    // 7. Total predictions (for the model metrics card)
-    Prediction.countDocuments(),
   ]);
 
   // Fetch real accuracy from Flask ML service (not averaged from old DB records)
@@ -145,9 +141,6 @@ const getAdminStats = async () => {
     averageYieldImprovement: 0,
   };
 
-  // modelMetrics[0] is now just the total prediction count from the last parallel query
-  const totalPredictions = modelMetrics; // renamed for clarity (it's a plain count now)
-
   return {
     totalSubmissions,
     totalUsers,
@@ -155,8 +148,8 @@ const getAdminStats = async () => {
     fertilizerUsage,
     yieldTrends,
     modelMetrics: liveMLMetrics
-      ? { ...liveMLMetrics, predictions: totalPredictions }
-      : { predictions: totalPredictions, accuracy: null, lastUpdate: null, modelVersion: null },
+      ? { ...liveMLMetrics, predictions: totalSubmissions }
+      : { predictions: totalSubmissions, accuracy: null, lastUpdate: null, modelVersion: null },
     ...metrics,
   };
 };
