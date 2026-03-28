@@ -210,6 +210,12 @@ export interface AdminStats {
     accuracy: number | null;
     lastUpdate: string | null;
   };
+  continuousLearning: {
+    totalVerified: number;
+    verifiedSinceLastRetrain: number;
+    retrainThreshold: number;
+    pendingVerifications: number;
+  };
   averageTemperature: number;
   averageHumidity: number;
   averageMoisture: number;
@@ -236,6 +242,98 @@ export const adminApi = {
 
   deactivateUser: (id: string) =>
     api.patch(`/admin/users/${encodeURIComponent(id)}/deactivate`),
+};
+
+// ─── Verification / Continuous Learning API ───────────────────────────────────
+export interface PendingVerification {
+  _id: string;
+  userId: { _id: string; name: string; email: string };
+  input: {
+    soilType: string;
+    cropType: string;
+    temperature: number;
+    humidity: number;
+    moisture: number;
+    nitrogen: number;
+    phosphorous: number;
+    potassium: number;
+  };
+  output: {
+    fertilizerName: string;
+    totalQty: number | null;
+    yieldImprovement: number | null;
+    modelConfidence: number | null;
+    soilHealthTips?: string[];
+  };
+  createdAt: string;
+}
+
+export const verificationApi = {
+  getPending: (page = 1, limit = 20) =>
+    api.get<{
+      data: {
+        predictions: PendingVerification[];
+        pagination: { total: number; page: number; limit: number; totalPages: number };
+      };
+    }>(`/admin/verifications?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`),
+
+  verify: (predictionId: string, note?: string) =>
+    api.post(`/admin/verifications/${encodeURIComponent(predictionId)}/verify`, { note }),
+};
+
+// ─── Status API (maintenance check) ────────────────────────────────────────────
+export const statusApi = {
+  getStatus: () =>
+    api.get<{ data: { inMaintenance: boolean; startedAt: string | null } }>('/status'),
+};
+
+// ─── User / Profile API ───────────────────────────────────────────────────────
+export interface UserStats {
+  totalAnalyses: number;
+  avgYieldImprovement: number;
+  avgModelConfidence: number;
+  topFertilizer: string | null;
+  topCrop: string | null;
+}
+
+export interface PredictionRecord {
+  _id: string;
+  input: {
+    soilType: string;
+    cropType: string;
+    temperature: number;
+    humidity: number;
+    moisture: number;
+    nitrogen: number;
+    potassium: number;
+    phosphorous: number;
+  };
+  output: {
+    fertilizerName: string;
+    nitrogenQty: number;
+    phosphorusQty: number;
+    potassiumQty: number;
+    totalQty: number;
+    yieldImprovement: number;
+    modelConfidence: number;
+    soilHealthTips: string[];
+  };
+  modelVersion: string;
+  processingMs: number;
+  createdAt: string;
+}
+
+export const userApi = {
+  getProfile: () =>
+    api.get<{ data: { user: User; stats: UserStats } }>('/users/profile'),
+
+  getHistory: (page = 1, limit = 10) =>
+    api.get<{
+      data: {
+        predictions: PredictionRecord[];
+        pagination: { total: number; page: number; limit: number; totalPages: number };
+      };
+    }>(`/users/profile/history?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`),
 };
 
 export default api;

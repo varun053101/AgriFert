@@ -14,7 +14,6 @@ const mlClient = axios.create({
 
 /**
  * Maps every fertilizer label the model can return to its NPK breakdown.
- * These are the standard 10 fertilizers used in Indian agriculture ML datasets.
  */
 const FERTILIZER_DETAILS = {
   "Urea":     { nitrogenQty: 46, phosphorusQty: 0,  potassiumQty: 0,  totalQty: 46 },
@@ -22,11 +21,11 @@ const FERTILIZER_DETAILS = {
   "MOP":      { nitrogenQty: 0,  phosphorusQty: 0,  potassiumQty: 60, totalQty: 60 },
   "SSP":      { nitrogenQty: 0,  phosphorusQty: 16, potassiumQty: 0,  totalQty: 16 },
   "NPK":      { nitrogenQty: 20, phosphorusQty: 20, potassiumQty: 20, totalQty: 60 },
+  "10-26-26": { nitrogenQty: 10, phosphorusQty: 26, potassiumQty: 26, totalQty: 62 },
   "14-35-14": { nitrogenQty: 14, phosphorusQty: 35, potassiumQty: 14, totalQty: 63 },
+  "20-20":    { nitrogenQty: 20, phosphorusQty: 20, potassiumQty: 0,  totalQty: 40 },
   "28-28":    { nitrogenQty: 28, phosphorusQty: 28, potassiumQty: 0,  totalQty: 56 },
   "17-17-17": { nitrogenQty: 17, phosphorusQty: 17, potassiumQty: 17, totalQty: 51 },
-  "20-20":    { nitrogenQty: 20, phosphorusQty: 20, potassiumQty: 0,  totalQty: 40 },
-  "10-26-26": { nitrogenQty: 10, phosphorusQty: 26, potassiumQty: 26, totalQty: 62 },
 };
 
 /**
@@ -56,8 +55,8 @@ const computeYieldImprovement = ({ confidence = 0.75, nitrogen, phosphorous, pot
 /**
  * Calls the Flask ML microservice.
  * Model features (in training order):
- *   Temperature, Humidity, Moisture, Soil Type, Crop Type,
- *   Nitrogen, Phosphorous, Potassium
+ *   temperature, humidity, moisture, soil_type, crop_type,
+ *   nitrogen, phosphorous, potassium
  */
 const getPrediction = async (inputData) => {
   const start = Date.now();
@@ -68,11 +67,11 @@ const getPrediction = async (inputData) => {
       temperature:  inputData.temperature,
       humidity:     inputData.humidity,
       moisture:     inputData.moisture,
-      soil_type:    inputData.soilType,    // Flask encoder expects title-case string
+      soil_type:    inputData.soilType,
       crop_type:    inputData.cropType,
       nitrogen:     inputData.nitrogen,
       potassium:    inputData.potassium,
-      phosphorous:  inputData.phosphorous, // matches model's column spelling
+      phosphorous:  inputData.phosphorous,
     });
   } catch (err) {
     if (err.code === "ECONNREFUSED") {

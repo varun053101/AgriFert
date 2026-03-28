@@ -1,7 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 import {
   Users,
   Sprout,
@@ -13,8 +19,12 @@ import {
   Activity,
   Thermometer,
   Droplets,
+  CheckCircle,
+  Clock,
+  ShieldCheck,
+  ChevronRight,
 } from 'lucide-react';
-import { adminApi } from '@/lib/api';
+import { adminApi, verificationApi, type PendingVerification } from '@/lib/api';
 import {
   BarChart,
   Bar,
@@ -53,7 +63,12 @@ interface AdminStats {
     accuracy: number | null;
     lastUpdate: string | null;
   };
-  // Spread from averageSoilMetrics
+  continuousLearning: {
+    totalVerified: number;
+    verifiedSinceLastRetrain: number;
+    retrainThreshold: number;
+    pendingVerifications: number;
+  };
   averageTemperature: number;
   averageHumidity: number;
   averageMoisture: number;
@@ -119,8 +134,167 @@ const DashboardSkeleton = () => (
   </Layout>
 );
 
+// ─── Pending Verifications Table ─────────────────────────────────────────────
+const PendingVerificationsSection = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-pending-verifications', page],
+    queryFn: async () => {
+      const res = await verificationApi.getPending(page, 10);
+      return res.data.data;
+    },
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: (id: string) => verificationApi.verify(id),
+    onSuccess: () => {
+      toast({ title: 'Prediction verified ✓', description: 'Record saved for continuous learning.' });
+      queryClient.invalidateQueries({ queryKey: ['admin-pending-verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+    onError: () => toast({ title: 'Verification failed', variant: 'destructive' }),
+  });
+
+  const predictions = data?.predictions ?? [];
+  const pagination  = data?.pagination;
+
+  return (
+    <Card variant="elevated" className="animate-fade-in" style={{ animationDelay: '0.9s' }}>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero">
+            <ShieldCheck className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div>
+            <CardTitle>Pending Verifications</CardTitle>
+            <CardDescription>Review and verify farmer predictions to improve the model</CardDescription>
+          </div>
+        </div>
+        {pagination && pagination.totalPages > 1 && (
+          <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+            Page {pagination.page} / {pagination.totalPages}
+          </span>
+        )}
+      </CardHeader>
+      <Separator />
+
+      {isLoading ? (
+        <div className="space-y-2 p-4">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+        </div>
+      ) : predictions.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-12 text-center">
+          <CheckCircle className="h-10 w-10 text-success" />
+          <p className="font-semibold text-foreground">All caught up!</p>
+          <p className="text-sm text-muted-foreground">No pending predictions to verify.</p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-3 p-4 md:hidden">
+            {predictions.map((p: PendingVerification) => (
+              <div key={p._id} className="rounded-xl border border-border/60 bg-card p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold capitalize">{p.input.cropType} / {p.input.soilType}</p>
+                    <p className="text-xs text-muted-foreground">{p.userId.name} · {p.userId.email}</p>
+                    <Badge variant="outline" className="mt-1 text-xs">{p.output.fertilizerName}</Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="shrink-0 gap-1"
+                    disabled={verifyMutation.isPending}
+                    onClick={() => verifyMutation.mutate(p._id)}
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Verify
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 bg-muted/30">
+                  {['Farmer', 'Crop / Soil', 'Fertilizer', 'Yield +', 'Confidence', 'Date', ''].map((h, i) => (
+                    <th key={i} className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground ${i === 0 || i === 1 || i === 2 ? 'text-left' : i === 6 ? 'text-right' : 'text-right'}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {predictions.map((p: PendingVerification) => (
+                  <tr key={p._id} className="border-b border-border/40 transition-colors hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{p.userId.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.userId.email}</p>
+                    </td>
+                    <td className="px-4 py-3 capitalize">
+                      <p>{p.input.cropType}</p>
+                      <p className="text-xs text-muted-foreground">{p.input.soilType} soil</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">{p.output.fertilizerName}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-success">
+                      {p.output.yieldImprovement != null ? `+${p.output.yieldImprovement}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {p.output.modelConfidence != null ? `${(p.output.modelConfidence * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground">
+                      {new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="gap-1"
+                        disabled={verifyMutation.isPending}
+                        onClick={() => verifyMutation.mutate(p._id)}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Verify
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border/50 px-4 py-3">
+              <span className="text-xs text-muted-foreground">
+                {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+};
+
 // ─── Main dashboard content ───────────────────────────────────────────────────
 const DashboardContent = ({ stats }: { stats: AdminStats }) => {
+  const navigate = useNavigate();
+  const cl = stats.continuousLearning ?? { totalVerified: 0, verifiedSinceLastRetrain: 0, retrainThreshold: 50, pendingVerifications: 0 };
+
   const statCards = [
     {
       title: 'Total Submissions',
@@ -135,18 +309,28 @@ const DashboardContent = ({ stats }: { stats: AdminStats }) => {
       color: 'bg-water/10 text-water',
     },
     {
-      title: 'Avg NPK — Nitrogen',
-      value: `${stats.averageNPK?.n ?? 0} kg/ha`,
-      icon: Sprout,
+      title: 'Verified Tests',
+      value: cl.totalVerified.toLocaleString(),
+      icon: CheckCircle,
       color: 'bg-success/10 text-success',
     },
     {
-      title: 'Model Accuracy',
-      value: stats.modelMetrics?.accuracy != null
-        ? `${stats.modelMetrics.accuracy}%`
-        : 'N/A',
-      icon: Target,
+      title: 'Pending Verification',
+      value: cl.pendingVerifications.toLocaleString(),
+      icon: Clock,
       color: 'bg-accent/20 text-accent-foreground',
+    },
+    {
+      title: 'Avg NPK — Nitrogen',
+      value: `${stats.averageNPK?.n ?? 0} kg/ha`,
+      icon: Sprout,
+      color: 'bg-soil/10 text-soil',
+    },
+    {
+      title: 'Model Accuracy',
+      value: stats.modelMetrics?.accuracy != null ? `${stats.modelMetrics.accuracy}%` : 'N/A',
+      icon: Target,
+      color: 'bg-primary/10 text-primary',
     },
   ];
 
@@ -162,8 +346,42 @@ const DashboardContent = ({ stats }: { stats: AdminStats }) => {
     borderRadius: '8px',
   };
 
+  const [showStickyBar, setShowStickyBar] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowStickyBar(window.scrollY > 160);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <Layout>
+      {/* ── Sticky summary bar ─────────────────────────────────────────────── */}
+      <div
+        className={`fixed left-0 right-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur transition-all duration-300 ${
+          showStickyBar ? 'top-16 translate-y-0 opacity-100 md:top-20' : '-top-20 -translate-y-full opacity-0'
+        }`}
+        style={{ transitionProperty: 'top, opacity, transform' }}
+      >
+        <div className="container flex h-12 items-center justify-between gap-4 overflow-x-auto">
+          <span className="shrink-0 text-sm font-semibold text-foreground">Admin Dashboard</span>
+          <div className="flex shrink-0 items-center gap-6 text-sm">
+            {[
+              { label: 'Submissions', value: stats.totalSubmissions.toLocaleString() },
+              { label: 'Users',       value: stats.totalUsers.toLocaleString() },
+              { label: 'Verified',    value: cl.totalVerified.toLocaleString() },
+              { label: 'Pending',     value: cl.pendingVerifications.toLocaleString() },
+              { label: 'Accuracy',    value: stats.modelMetrics?.accuracy != null ? `${stats.modelMetrics.accuracy}%` : '—' },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">{label}:</span>
+                <span className="font-semibold text-foreground">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="container py-8 md:py-12">
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold text-foreground md:text-4xl">
@@ -175,13 +393,13 @@ const DashboardContent = ({ stats }: { stats: AdminStats }) => {
         </div>
 
         {/* Overview Stats */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {statCards.map((stat, i) => (
             <Card
               key={stat.title}
               variant="gradient"
               className="animate-fade-in"
-              style={{ animationDelay: `${i * 0.1}s` }}
+              style={{ animationDelay: `${i * 0.08}s` }}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -197,6 +415,61 @@ const DashboardContent = ({ stats }: { stats: AdminStats }) => {
             </Card>
           ))}
         </div>
+
+        {/* Continuous Learning Progress Card */}
+        <Card variant="elevated" className="mb-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-hero">
+                <Brain className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <CardTitle>Continuous Learning</CardTitle>
+                <CardDescription>Verified records progress toward next model retrain</CardDescription>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => navigate('/admin/verifications')}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              View Verifications
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {cl.verifiedSinceLastRetrain} new verified / {cl.retrainThreshold} needed
+              </span>
+              <span className="font-semibold text-foreground">
+                {Math.min(100, Math.round((cl.verifiedSinceLastRetrain / cl.retrainThreshold) * 100))}%
+              </span>
+            </div>
+            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
+              <div
+                className="absolute left-0 top-0 h-full rounded-full bg-gradient-hero transition-all duration-700"
+                style={{ width: `${Math.min(100, (cl.verifiedSinceLastRetrain / cl.retrainThreshold) * 100)}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="rounded-lg bg-muted p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Verified</p>
+                <p className="text-lg font-bold text-foreground">{cl.totalVerified}</p>
+              </div>
+              <div className="rounded-lg bg-muted p-3 text-center">
+                <p className="text-xs text-muted-foreground">Since Last Retrain</p>
+                <p className="text-lg font-bold text-foreground">{cl.verifiedSinceLastRetrain}</p>
+              </div>
+              <div className="rounded-lg bg-muted p-3 text-center">
+                <p className="text-xs text-muted-foreground">Threshold</p>
+                <p className="text-lg font-bold text-foreground">{cl.retrainThreshold}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Average Metrics Row */}
         <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -419,6 +692,33 @@ const DashboardContent = ({ stats }: { stats: AdminStats }) => {
             ) : (
               <p className="py-8 text-center text-muted-foreground text-sm">No crop data yet</p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Verifications CTA */}
+        <Card
+          variant="elevated"
+          className="mt-6 animate-fade-in cursor-pointer transition-shadow hover:shadow-elevated"
+          style={{ animationDelay: '0.9s' }}
+          onClick={() => navigate('/admin/verifications')}
+        >
+          <CardContent className="flex flex-col items-center gap-4 py-10 text-center sm:flex-row sm:text-left">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-hero">
+              <ShieldCheck className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="text-lg font-semibold text-foreground">
+                {cl.pendingVerifications > 0
+                  ? `${cl.pendingVerifications} Prediction${cl.pendingVerifications > 1 ? 's' : ''} Awaiting Verification`
+                  : 'Verification Centre'}
+              </p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {cl.pendingVerifications > 0
+                  ? 'Review model outputs, contact farmers, and mark predictions as verified to improve the AI model.'
+                  : 'All predictions are verified. Great work!'}
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
           </CardContent>
         </Card>
       </div>

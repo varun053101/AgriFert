@@ -18,10 +18,12 @@ const Header = () => {
   const navLinks = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/analyze', label: 'Analyze Soil', icon: FlaskConical },
+    ...(isAuthenticated
+      ? [{ path: '/profile', label: 'My Profile', icon: User }]
+      : []),
     ...(user?.role === 'admin'
       ? [{ path: '/admin', label: 'Admin Dashboard', icon: LayoutDashboard }]
       : []),
-
   ];
 
   const handleLogout = async () => {
@@ -67,9 +69,11 @@ const Header = () => {
           <div className="ml-2 flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground select-none">
-                  {initials}
-                </div>
+                <Link to="/profile" title="View profile">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground select-none hover:opacity-80 transition-opacity cursor-pointer">
+                    {initials}
+                  </div>
+                </Link>
                 <span className="hidden text-sm font-medium text-foreground lg:block">
                   {user?.name}
                 </span>

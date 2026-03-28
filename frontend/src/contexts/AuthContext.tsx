@@ -1,4 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+
 import { authApi, User } from '@/lib/api';
 import { setTokens, clearTokens, getAccessToken } from '@/lib/auth';
 
