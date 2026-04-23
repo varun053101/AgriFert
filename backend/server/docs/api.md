@@ -39,6 +39,19 @@ Admin routes additionally require `role: "admin"` on the authenticated user.
 }
 ```
 
+### Maintenance (503)
+
+Returned by all non-exempt routes while model retraining is in progress:
+
+```json
+{
+  "success": false,
+  "maintenance": true,
+  "message": "AgriFert is temporarily under maintenance while the AI model is being retrained. Please try again in a few minutes.",
+  "startedAt": "2026-04-23T11:00:00.000Z"
+}
+```
+
 ---
 
 ## Status Codes
@@ -47,12 +60,50 @@ Admin routes additionally require `role: "admin"` on the authenticated user.
 |------|---------|
 | `200` | OK |
 | `201` | Created |
+| `202` | Accepted (async task started) |
 | `400` | Bad Request / Validation error |
 | `401` | Unauthenticated |
 | `403` | Forbidden (insufficient role) |
 | `404` | Not Found |
+| `409` | Conflict (e.g. already verified) |
 | `429` | Too Many Requests |
 | `500` | Internal Server Error |
+| `503` | Service Unavailable (maintenance mode) |
+
+---
+
+## App Status — `/api/status`
+
+### `GET /api/status`
+
+No authentication required. Used by the frontend to poll for maintenance mode.
+
+**Response `200`**
+
+```json
+{
+  "success": true,
+  "data": {
+    "inMaintenance": false,
+    "startedAt": null
+  }
+}
+```
+
+When retraining is active:
+
+```json
+{
+  "success": true,
+  "data": {
+    "inMaintenance": true,
+    "startedAt": "2026-04-23T11:05:00.000Z"
+  }
+}
+```
+
+> The frontend `MaintenanceOverlay` component polls this endpoint every 10 seconds.
+> Exempt from maintenance blocking.
 
 ---
 
@@ -206,8 +257,6 @@ Submit soil and crop parameters to receive a fertilizer recommendation.
   "nitrogen":    40,
   "phosphorous": 30,
   "potassium":   20,
-  "state":       "Maharashtra",
-  "district":    "Pune",
   "coordinates": { "lat": 18.52, "lon": 73.85 }
 }
 ```
@@ -222,9 +271,7 @@ Submit soil and crop parameters to receive a fertilizer recommendation.
 | `nitrogen` | number | ✓ | kg/ha, min 0 |
 | `phosphorous` | number | ✓ | kg/ha, min 0 |
 | `potassium` | number | ✓ | kg/ha, min 0 |
-| `state` | string | – | Location metadata |
-| `district` | string | – | Location metadata |
-| `coordinates` | object | – | `{ lat, lon }` |
+| `coordinates` | object | – | `{ lat, lon }` — used for live weather lookup |
 
 **Response `201`**
 
@@ -253,6 +300,8 @@ Submit soil and crop parameters to receive a fertilizer recommendation.
   }
 }
 ```
+
+> After receiving results, the user can download a formatted PDF report via the browser print dialog.
 
 ---
 
@@ -285,16 +334,6 @@ Paginated prediction history for the authenticated user.
 ### `GET /api/analyze/:id`
 
 Fetch a single prediction. Users can only access their own records.
-
-**Response `200`**
-
-```json
-{
-  "success": true,
-  "message": "Prediction fetched",
-  "data": { "prediction": { "..." } }
-}
-```
 
 **Errors:** `404` if not found or belongs to another user.
 
@@ -331,9 +370,47 @@ Proxy to OpenWeatherMap. Returns weather for the given coordinates.
 
 ---
 
+## User Profile — `/api/users` 🔒
+
+### `GET /api/users/profile`
+
+Returns the authenticated user's profile and aggregated stats.
+
+**Response `200`**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "_id": "...", "name": "Varun", "email": "...", "role": "user", "createdAt": "..." },
+    "stats": {
+      "totalAnalyses": 12,
+      "avgYieldImprovement": 14.3,
+      "avgModelConfidence": 0.871,
+      "topFertilizer": "Urea",
+      "topCrop": "rice"
+    }
+  }
+}
+```
+
+---
+
+### `GET /api/users/profile/history`
+
+Paginated prediction history for the authenticated user.
+
+| Param | Default | Max |
+|-------|---------|-----|
+| `page` | `1` | — |
+| `limit` | `10` | `50` |
+
+---
+
 ## Admin — `/api/admin` 🔒🛡️
 
-> Requires `role: "admin"` in addition to a valid JWT.
+> Requires `role: "admin"` in addition to a valid JWT.  
+> These routes are **exempt from maintenance mode blocking**.
 
 ### `GET /api/admin/stats`
 
@@ -346,15 +423,28 @@ Aggregate dashboard statistics.
   "success": true,
   "message": "Admin stats fetched",
   "data": {
+    "totalSubmissions": 940,
     "totalUsers": 128,
-    "totalPredictions": 940,
-    "topFertilizers": [
-      { "name": "Urea", "count": 312 }
-    ],
-    "predictionsPerDay": [
-      { "date": "2025-03-24", "count": 45 }
-    ],
-    "avgConfidence": 0.877
+    "cropDistribution": [ { "name": "rice", "value": 312 } ],
+    "fertilizerUsage":  [ { "name": "Urea", "usage": 312 } ],
+    "yieldTrends":      [ { "month": "Apr 2026", "yield": 18.2, "count": 45 } ],
+    "modelMetrics": {
+      "modelVersion": "1.2.0",
+      "predictions": 940,
+      "accuracy": 99.1,
+      "lastUpdate": "2026-04-23T10:00:00Z"
+    },
+    "continuousLearning": {
+      "totalVerified": 120,
+      "verifiedSinceLastRetrain": 3,
+      "retrainThreshold": 50,
+      "pendingVerifications": 37
+    },
+    "averageTemperature": 28.4,
+    "averageHumidity": 71.2,
+    "averageMoisture": 44.8,
+    "averageNPK": { "n": 41.3, "p": 30.1, "k": 19.7 },
+    "averageYieldImprovement": 16.8
   }
 }
 ```
@@ -365,8 +455,6 @@ Aggregate dashboard statistics.
 
 All predictions with filtering and pagination.
 
-**Query Parameters**
-
 | Param | Default | Description |
 |-------|---------|-------------|
 | `page` | `1` | Page number |
@@ -375,46 +463,16 @@ All predictions with filtering and pagination.
 | `sortBy` | `createdAt` | Sort field |
 | `order` | `desc` | `asc` or `desc` |
 
-**Response `200`**
-
-```json
-{
-  "success": true,
-  "message": "Predictions fetched",
-  "data": {
-    "predictions": [ { "..." } ],
-    "pagination": { "total": 940, "page": 1, "limit": 20, "totalPages": 47 }
-  }
-}
-```
-
 ---
 
 ### `GET /api/admin/users`
 
 List all users (passwords and refresh tokens excluded).
 
-**Query Parameters**
-
 | Param | Default | Max |
 |-------|---------|-----|
 | `page` | `1` | — |
 | `limit` | `20` | `100` |
-
-**Response `200`**
-
-```json
-{
-  "success": true,
-  "message": "Users fetched",
-  "data": {
-    "users": [
-      { "_id": "...", "name": "Varun", "email": "...", "role": "user", "isActive": true }
-    ],
-    "pagination": { "total": 128, "page": 1, "limit": 20, "totalPages": 7 }
-  }
-}
-```
 
 ---
 
@@ -432,11 +490,91 @@ Deactivate a user and immediately invalidate their session.
 
 ---
 
+## Continuous Learning — `/api/admin` 🔒🛡️
+
+### `GET /api/admin/verifications`
+
+Returns all predictions that have **not** yet been verified by an admin.  
+Displayed in the dedicated **Verification Centre** at `/admin/verifications`.  
+Cards are collapsed by default (summary row); clicking expands full model output.
+
+| Param | Default | Max |
+|-------|---------|-----|
+| `page` | `1` | — |
+| `limit` | `20` | `100` |
+
+**Response `200`**
+
+```json
+{
+  "success": true,
+  "data": {
+    "predictions": [
+      {
+        "_id": "...",
+        "userId": { "_id": "...", "name": "Farmer Joe", "email": "joe@farm.com" },
+        "input": {
+          "soilType": "Black",
+          "cropType": "rice",
+          "temperature": 28.5,
+          "humidity": 72,
+          "moisture": 45,
+          "nitrogen": 40,
+          "phosphorous": 30,
+          "potassium": 20
+        },
+        "output": {
+          "fertilizerName": "Urea",
+          "totalQty": 140,
+          "yieldImprovement": 18,
+          "modelConfidence": 0.9214,
+          "soilHealthTips": ["Add organic compost...", "Test soil pH..."]
+        },
+        "createdAt": "2026-04-01T10:00:00Z"
+      }
+    ],
+    "pagination": { "total": 38, "page": 1, "limit": 20, "totalPages": 2 }
+  }
+}
+```
+
+> The admin can **Download PDF** from any expanded card (browser print dialog).
+
+---
+
+### `POST /api/admin/verifications/:predictionId/verify`
+
+Mark a prediction as verified after the admin has contacted the farmer and confirmed the outcome.  
+Creates a `VerifiedRecord` and asynchronously triggers a retrain if `RETRAIN_THRESHOLD` is reached.  
+During retraining, **maintenance mode is automatically activated and then cleared**.
+
+**Request (optional)**
+
+```json
+{ "note": "Farmer confirmed good yield this season." }
+```
+
+**Response `201`**
+
+```json
+{
+  "success": true,
+  "message": "Prediction verified successfully",
+  "data": {
+    "verified": { "_id": "...", "predictionId": "...", "usedInRetrain": false }
+  }
+}
+```
+
+**Errors:** `404` prediction not found, `409` already verified.
+
+---
+
 ## Health Check
 
 ### `GET /health`
 
-No authentication. No rate limit.
+No authentication. No rate limit. Exempt from maintenance mode.
 
 **Response `200`**
 
@@ -458,3 +596,11 @@ No authentication. No rate limit.
 | `POST /api/auth/login` | 5 req / 15 min / IP |
 | `POST /api/analyze` | 20 req / 15 min / IP |
 | All other `/api/*` | Global limiter (env-configurable) |
+
+---
+
+## Auto-Cleanup (Unverified Prediction TTL)
+
+The server runs a daily job that deletes unverified predictions older than
+`UNVERIFIED_TTL_DAYS` (default **90 days**). Predictions with a corresponding
+`VerifiedRecord` are never auto-deleted.

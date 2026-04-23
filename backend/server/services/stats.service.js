@@ -1,6 +1,7 @@
 const axios = require("axios");
 const Prediction = require("../models/Prediction");
 const User = require("../models/User");
+const VerifiedRecord = require("../models/VerifiedRecord");
 
 // Axios instance for internal Node ↔ Flask calls
 const mlClient = axios.create({
@@ -33,6 +34,8 @@ const fetchMLMetrics = async () => {
  * Uses parallel aggregation queries for speed.
  */
 const getAdminStats = async () => {
+  const RETRAIN_THRESHOLD = parseInt(process.env.RETRAIN_THRESHOLD) || 50;
+
   const [
     totalSubmissions,
     totalUsers,
@@ -40,6 +43,8 @@ const getAdminStats = async () => {
     fertilizerUsage,
     averageSoilMetrics,
     yieldTrends,
+    totalVerified,
+    verifiedSinceLastRetrain,
   ] = await Promise.all([
     // 1. Total prediction count
     Prediction.countDocuments(),
@@ -128,6 +133,12 @@ const getAdminStats = async () => {
         },
       },
     ]),
+
+    // 7. Total verified records (all time)
+    VerifiedRecord.countDocuments(),
+
+    // 8. Verified since last retrain (not yet consumed)
+    VerifiedRecord.countDocuments({ usedInRetrain: false }),
   ]);
 
   // Fetch real accuracy from Flask ML service (not averaged from old DB records)
@@ -150,6 +161,12 @@ const getAdminStats = async () => {
     modelMetrics: liveMLMetrics
       ? { ...liveMLMetrics, predictions: totalSubmissions }
       : { predictions: totalSubmissions, accuracy: null, lastUpdate: null, modelVersion: null },
+    continuousLearning: {
+      totalVerified,
+      verifiedSinceLastRetrain,
+      retrainThreshold: RETRAIN_THRESHOLD,
+      pendingVerifications: totalSubmissions - totalVerified,
+    },
     ...metrics,
   };
 };

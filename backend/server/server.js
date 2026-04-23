@@ -10,6 +10,10 @@ const connectDB = require("./config/db");
 const logger = require("./middleware/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalLimiter } = require("./middleware/rateLimiter");
+const Prediction = require("./models/Prediction");
+const VerifiedRecord = require("./models/VerifiedRecord");
+const maintenanceMiddleware = require("./middleware/maintenanceMiddleware");
+const { getStatus } = require("./utils/maintenanceMode");
 
 const app = express();
 
@@ -49,8 +53,17 @@ app.use(logger);
 // ── Global Rate Limit ─────────────────────────────────────────────────────────
 app.use("/api", globalLimiter);
 
+// ── Maintenance Mode (checked before routes, exempt: /api/auth, /api/admin, /health) ──
+app.use(maintenanceMiddleware);
+
+// ── App Status (public — used by frontend to detect maintenance) ──────────────
+app.get("/api/status", (req, res) => {
+  res.json({ success: true, data: getStatus() });
+});
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth",    require("./routes/auth.routes"));
+app.use("/api/users",   require("./routes/user.routes"));
 app.use("/api/analyze", require("./routes/analyze.routes"));
 app.use("/api/weather", require("./routes/weather.routes"));
 app.use("/api/admin",   require("./routes/admin.routes"));
@@ -88,5 +101,36 @@ process.on("SIGTERM", () => {
   console.log("[SIGTERM] Shutting down gracefully...");
   server.close(() => process.exit(0));
 });
+
+// ── Daily Cleanup: delete unverified predictions older than TTL ───────────────
+const TTL_DAYS = parseInt(process.env.UNVERIFIED_TTL_DAYS) || 90;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const runCleanup = async () => {
+  try {
+    const cutoff = new Date(Date.now() - TTL_DAYS * MS_PER_DAY);
+
+    // Find IDs of predictions that HAVE been verified (keep these forever)
+    const verifiedIds = await VerifiedRecord.distinct("predictionId");
+
+    // Delete unverified predictions older than the TTL
+    const result = await Prediction.deleteMany({
+      _id:       { $nin: verifiedIds },
+      createdAt: { $lt: cutoff },
+    });
+
+    if (result.deletedCount > 0) {
+      console.log(
+        `[CLEANUP] Deleted ${result.deletedCount} unverified prediction(s) older than ${TTL_DAYS} days.`
+      );
+    }
+  } catch (err) {
+    console.error("[CLEANUP] Error during unverified prediction cleanup:", err.message);
+  }
+};
+
+// Run once at startup (after a short delay) then every 24 h
+setTimeout(runCleanup, 10_000);
+setInterval(runCleanup, MS_PER_DAY);
 
 module.exports = app;
